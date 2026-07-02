@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+import io
 
 # ==============================================================================
 # 1. CẤU HÌNH TRANG WEB CỦA ỨNG DỤNG
@@ -6,13 +8,22 @@ import streamlit as st
 st.set_page_config(page_title="Hệ Thống Tính Thuế & Chi Phí Nhân Sự 2026", page_icon="📊", layout="centered")
 
 # --- CHÈN LOGO THEO FILE TRỰC TIẾP ---
-st.image("logo.jpg")
+try:
+    st.image("logo.jpg")
+except:
+    pass # Bỏ qua nếu chưa có file logo ở thư mục chạy
 
 # --- THÔNG TIN THÀNH VIÊN VÀ ĐỀ TÀI ---
 st.markdown("### 📝 **Nguyễn Minh Tâm**")
 st.title("📊 Hệ Thống Quản Lý Tài Chính & Thu Thập Thuế 2026")
 st.write("Giải pháp tích hợp tính Thuế TNCN (Dành cho Người lao động) và Chi phí nhân sự (Dành cho Doanh nghiệp)")
 st.markdown("---")
+
+# --- KHỞI TẠO BỘ NHỚ LƯU TRỮ LỊCH SỬ (SESSION STATE) ---
+if "lich_su_nld" not in st.session_state:
+    st.session_state.lich_su_nld = []
+if "lich_su_dn" not in st.session_state:
+    st.session_state.lich_su_dn = []
 
 
 # ==============================================================================
@@ -62,7 +73,7 @@ if "👤 Người lao động" in vai_tro:
         total_reduction = self_reduction + dependent_reduction
         
         exempt_lunch = min(lunch, 730000)
-        exempt_allowance = other 
+        exempt_allowance = other  
         total_exempt_income = overtime + exempt_lunch + exempt_allowance
         
         assessable_income = max(0, total_income - total_exempt_income - total_insurance - total_reduction)
@@ -107,6 +118,22 @@ if "👤 Người lao động" in vai_tro:
 
     if st.button("🧮 Tính Thuế & Nhận Kết Quả", type="primary"):
         res = tinh_thue_tncn(gross_salary, gross_bonus_pay, overtime_pay, lunch_allowance, other_allowance, dependents)
+        
+        # --- Ghi dữ liệu tính toán vào lịch sử ---
+        st.session_state.lich_su_nld.append({
+            "Thời gian": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "Lương đóng BHXH (VND)": gross_salary,
+            "Tiền thưởng/Bonus (VND)": gross_bonus_pay,
+            "Lương tăng ca (VND)": overtime_pay,
+            "Phụ cấp ăn trưa (VND)": lunch_allowance,
+            "Phụ cấp khác (VND)": other_allowance,
+            "Số người phụ thuộc": dependents,
+            "Tổng thu nhập (VND)": res['total_income'],
+            "Tổng BH bắt buộc (VND)": res['total_insurance'],
+            "Thuế TNCN phải nộp (VND)": res['tax'],
+            "Thực nhận NET (VND)": res['net_salary']
+        })
+
         st.markdown("---")
         st.subheader("🎯 Kết Quả Tính Toán Tóm Tắt")
         
@@ -140,6 +167,33 @@ if "👤 Người lao động" in vai_tro:
             st.table(res['tax_breakdown'])
         else:
             st.success("Tuyệt vời! Sau khi trừ các khoản phụ cấp miễn thuế và giảm trừ gia cảnh, thu nhập tính thuế của bạn bằng 0 nên không cần phải nộp thuế TNCN.")
+
+    # --- HIỂN THỊ VÀ XUẤT FILE EXCEL CHO NGƯỜI LAO ĐỘNG ---
+    if st.session_state.lich_su_nld:
+        st.markdown("---")
+        st.subheader("🕒 Lịch Sử Các Lần Tính Toán")
+        df_nld = pd.DataFrame(st.session_state.lich_su_nld)
+        
+        # Format hiển thị trên giao diện cho đẹp
+        st.dataframe(df_nld.style.format({
+            "Lương đóng BHXH (VND)": "{:,.0f}", "Tiền thưởng/Bonus (VND)": "{:,.0f}", "Lương tăng ca (VND)": "{:,.0f}",
+            "Phụ cấp ăn trưa (VND)": "{:,.0f}", "Phụ cấp khác (VND)": "{:,.0f}", "Tổng thu nhập (VND)": "{:,.0f}",
+            "Tổng BH bắt buộc (VND)": "{:,.0f}", "Thuế TNCN phải nộp (VND)": "{:,.0f}", "Thực nhận NET (VND)": "{:,.0f}"
+        }))
+        
+        # Build file excel truyền vào st.download_button
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_nld.to_excel(writer, index=False, sheet_name="Lịch sử Thuế TNCN")
+        excel_data = output.getvalue()
+        
+        st.download_button(
+            label="📥 Xuất lịch sử tính toán sang file Excel",
+            data=excel_data,
+            file_name="lich_su_tinh_thue_NLD_2026.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="secondary"
+        )
 
 
 # ==============================================================================
@@ -187,6 +241,25 @@ else:
 
     if st.button("🏢 Tính Toán Chi Phí Doanh Nghiệp", type="primary"):
         res_dn = tinh_chi_phi_nsdld(dn_gross, dn_bonus, dn_overtime, dn_lunch, dn_other)
+        
+        # --- Ghi dữ liệu tính toán vào lịch sử ---
+        st.session_state.lich_su_dn.append({
+            "Thời gian": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "Lương đóng BHXH (VND)": dn_gross,
+            "Tiền thưởng (VND)": dn_bonus,
+            "Lương tăng ca (VND)": dn_overtime,
+            "Phụ cấp ăn trưa (VND)": dn_lunch,
+            "Phụ cấp khác (VND)": dn_other,
+            "Tổng lương trực tiếp (VND)": res_dn['direct_salary_cost'],
+            "BHXH Hưu trí 14% (VND)": res_dn['bhxh_huu_tri'],
+            "BHXH Ốm thai 3% (VND)": res_dn['bhxh_om_thai'],
+            "BH TNLD-BNN 0.5% (VND)": res_dn['bhxh_tnld'],
+            "BHYT Doanh nghiệp 3% (VND)": res_dn['bhyt'],
+            "BHTN Doanh nghiệp 1% (VND)": res_dn['bhtn'],
+            "Tổng BH Doanh nghiệp gánh (VND)": res_dn['total_nsdld_insurance'],
+            "TỔNG CHI PHÍ NHÂN SỰ (VND)": res_dn['total_corporate_cost']
+        })
+
         st.markdown("---")
         st.subheader("🎯 Tổng Hợp Chi Phí Nhân Sự (Tổng Doanh Nghiệp Chi)")
         
@@ -210,3 +283,32 @@ else:
         
         st.table(insurance_data)
         st.info("💡 **Lưu ý kế toán:** Tổng chi phí thực tế của doanh nghiệp (Total Cost) là cơ sở để lập ngân sách nhân sự và tính toán chi phí được trừ khi xác định thuế Thu nhập Doanh nghiệp (TNDN).")
+
+    # --- HIỂN THỊ VÀ XUẤT FILE EXCEL CHO DOANH NGHIỆP ---
+    if st.session_state.lich_su_dn:
+        st.markdown("---")
+        st.subheader("🕒 Lịch Sử Các Lần Tính Toán")
+        df_dn = pd.DataFrame(st.session_state.lich_su_dn)
+        
+        # Format hiển thị số tiền ngăn cách hàng nghìn trên giao diện
+        st.dataframe(df_dn.style.format({
+            "Lương đóng BHXH (VND)": "{:,.0f}", "Tiền thưởng (VND)": "{:,.0f}", "Lương tăng ca (VND)": "{:,.0f}",
+            "Phụ cấp ăn trưa (VND)": "{:,.0f}", "Phụ cấp khác (VND)": "{:,.0f}", "Tổng lương trực tiếp (VND)": "{:,.0f}",
+            "BHXH Hưu trí 14% (VND)": "{:,.0f}", "BHXH Ốm thai 3% (VND)": "{:,.0f}", "BH TNLD-BNN 0.5% (VND)": "{:,.0f}",
+            "BHYT Doanh nghiệp 3% (VND)": "{:,.0f}", "BHTN Doanh nghiệp 1% (VND)": "{:,.0f}", 
+            "Tổng BH Doanh nghiệp gánh (VND)": "{:,.0f}", "TỔNG CHI PHÍ NHÂN SỰ (VND)": "{:,.0f}"
+        }))
+        
+        # Build file excel truyền vào st.download_button
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_dn.to_excel(writer, index=False, sheet_name="Lịch sử Chi Phí DN")
+        excel_data = output.getvalue()
+        
+        st.download_button(
+            label="📥 Xuất lịch sử tính toán sang file Excel",
+            data=excel_data,
+            file_name="lich_su_chi_phi_DN_2026.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="secondary"
+        )
