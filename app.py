@@ -15,14 +15,14 @@ except:
 
 # --- THÔNG TIN THÀNH VIÊN VÀ ĐỀ TÀI ---
 st.markdown("### 📝 **ĐỀ TÀI 5
-Trần Thị Phượng 23030066
-Nguyễn Thị Như Ý 23030077
-Trần Tấn Phát 23030089
-Nguyễn Xuân Tài 23030262
-Đỗ Nguyễn Trúc Linh 23120087
-Phan Thị Lan Thanh 23030094
-Nguyễn Hoàng Phúc 23030061
-Nguyễn Minh Tâm 23030232 **")
+ Trần Thị Phượng 23030066
+ Nguyễn Thị Như Ý 23030077
+ Trần Tấn Phát 23030089
+ Nguyễn Xuân Tài 23030262
+ Đỗ Nguyễn Trúc Linh 23120087
+ Phan Thị Lan Thanh 23030094
+ Nguyễn Hoàng Phúc 23030061
+ Nguyễn Minh Tâm 23030232 **")
 st.title("📊 Hệ Thống Quản Lý Tài Chính & Thu Thập Thuế 2026")
 st.write("Giải pháp tích hợp tính Thuế TNCN (Dành cho Người lao động) và Chi phí nhân sự (Dành cho Doanh nghiệp)")
 st.markdown("---")
